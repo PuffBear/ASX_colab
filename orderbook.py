@@ -176,6 +176,14 @@ class OrderBook:
         self.skiplist = SkipList()
         self.orders = {} # create a hashset for orderId lookup.
 
+    def get_best_bid(self):
+        """ Get the best bid price using SkipList """
+        return self.skiplist.getBestBid()
+
+    def get_best_ask(self):
+        """ Get the best ask price using SkipList """
+        return self.skiplist.getBestAsk()
+
     def addOrder(self, order):
         ''' Add an order to the OrderBook. '''
         price_node = self.skiplist.insertPrice(order.price) # instantiate a node for the skiplist
@@ -220,16 +228,16 @@ class OrderBook:
             - Stop orders
         """
 
-        best_bid = self.getBestBid()
-        best_ask = self.getBestAsk()
+        best_bid = self.get_best_bid()
+        best_ask = self.get_best_ask()
 
         if best_bid is None or best_ask is None:
             return  # No trades possible
 
         # 1. Convert STOP Orders to Market Orders if Triggered
         """ Convert Stop Orders to Market Orders when triggered """
-        best_bid = self.getBestBid()
-        best_ask = self.getBestAsk()
+        best_bid = self.get_best_bid()
+        best_ask = self.get_best_ask()
 
         for order in list(self.orders.values()):
             if order.orderType == "STOP":
@@ -250,13 +258,13 @@ class OrderBook:
                 """
                 while order.quantity > 0:
                     if order.side == "BUY":
-                        best_ask = self.getBestAsk()
+                        best_ask = self.get_best_ask()
                         if best_ask is None:
                             print(f"Market BUY Order {order.orderId} partially filled, remaining: {order.quantity}")
                             break
                         match_orders = self.skiplist.insertPrice(best_ask).orders
                     else:
-                        best_bid = self.getBestBid()
+                        best_bid = self.get_best_bid()
                         if best_bid is None:
                             print(f"Market SELL Order {order.orderId} partially filled, remaining: {order.quantity}")
                             break
@@ -294,7 +302,7 @@ class OrderBook:
         """
         if order.side == "BUY":
             while order.quantity > 0:
-                best_ask = self.getBestAsk()
+                best_ask = self.get_best_ask()
                 if best_ask is None or best_ask > order.price:
                     break
                 ask_orders = self.skiplist.insertPrice(best_ask).orders
@@ -318,7 +326,7 @@ class OrderBook:
                     self.cancelOrder(order.orderId)
         else:
             while order.quantity > 0:
-                best_bid = self.getBestBid()
+                best_bid = self.get_best_bid()
                 if best_bid is None or best_bid < order.price:
                     break
                 bid_orders = self.skiplist.insertPrice(best_bid).orders
