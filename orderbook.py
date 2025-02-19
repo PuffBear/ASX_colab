@@ -163,7 +163,7 @@ class SkipList:
             current = current.forward[0]
         return current.price if current.price!=-(float('inf')) else None
     
-    def getbestAsk(self):
+    def getBestAsk(self):
         ''' Function to get the best ask/sell side order in the skiplist. '''
         return self.head.forward[0].price if self.head.forward[0] else None
     
@@ -179,7 +179,7 @@ class OrderBook:
     def addOrder(self, order):
         ''' Add an order to the OrderBook. '''
         price_node = self.skiplist.insertPrice(order.price) # instantiate a node for the skiplist
-        price_node.orders.add_order(order) # like a vector pushback function call
+        price_node.orders.addOrder(order) # like a vector pushback function call
         self.orders[order.orderId] = order  # Store in HashMap
 
     def cancelOrder(self, orderId):
@@ -220,8 +220,8 @@ class OrderBook:
             - Stop orders
         """
 
-        best_bid = self.get_best_bid()
-        best_ask = self.get_best_ask()
+        best_bid = self.getBestBid()
+        best_ask = self.getBestAsk()
 
         if best_bid is None or best_ask is None:
             return  # No trades possible
