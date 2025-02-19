@@ -163,7 +163,7 @@ class SkipList:
             current = current.forward[0]
         return current.price if current.price!=-(float('inf')) else None
     
-    def getbestBid(self):
+    def getbestAsk(self):
         ''' Function to get the best ask/sell side order in the skiplist. '''
         return self.head.forward[0].price if self.head.forward[0] else None
     
@@ -178,7 +178,7 @@ class OrderBook:
 
     def addOrder(self, order):
         ''' Add an order to the OrderBook. '''
-        price_node = self.skiplist.insert_price(order.price) # instantiate a node for the skiplist
+        price_node = self.skiplist.insertPrice(order.price) # instantiate a node for the skiplist
         price_node.orders.add_order(order) # like a vector pushback function call
         self.orders[order.orderId] = order  # Store in HashMap
 
@@ -226,7 +226,11 @@ class OrderBook:
         if best_bid is None or best_ask is None:
             return  # No trades possible
 
-        # 1. Convert Stop Orders to Market Orders if Triggered
+        # 1. Convert STOP Orders to Market Orders if Triggered
+        """ Convert Stop Orders to Market Orders when triggered """
+        best_bid = self.getBestBid()
+        best_ask = self.getBestAsk()
+
         for order in list(self.orders.values()):
             if order.orderType == "STOP":
                 if order.side == "BUY" and best_ask and order.price <= best_ask:
@@ -236,70 +240,110 @@ class OrderBook:
                     print(f"Stop SELL Order {order.orderId} triggered at {order.price}, converting to MARKET")
                     order.orderType = "MARKET"
 
-        # 2. Execute Market Orders Immediately at Best Price (with partial fills)
+        # 2. Execute MARKET Orders Immediately at Best Price (with partial fills)
         for order in list(self.orders.values()):
             if order.orderType == "MARKET":
-                while order.quantity > 0:  # Loop until the market order is fully filled
+                """ 
+                Execute Market Orders:
+                    - Sweep through multiple price levels until fully filled
+                    - Execute partial fills across multiple orders
+                """
+                while order.quantity > 0:
                     if order.side == "BUY":
-                        best_ask = self.get_best_ask()
+                        best_ask = self.getBestAsk()
                         if best_ask is None:
-                            print(f"Market BUY Order {order.orderId} partially filled, remaining quantity: {order.quantity}")
+                            print(f"Market BUY Order {order.orderId} partially filled, remaining: {order.quantity}")
                             break
-                        match_order = self.skiplist.insertPrice(best_ask).orders.getOldestOrder()
-                    else:  # SELL Market Order
-                        best_bid = self.get_best_bid()
+                        match_orders = self.skiplist.insertPrice(best_ask).orders
+                    else:
+                        best_bid = self.getBestBid()
                         if best_bid is None:
-                            print(f"Market SELL Order {order.orderId} partially filled, remaining quantity: {order.quantity}")
+                            print(f"Market SELL Order {order.orderId} partially filled, remaining: {order.quantity}")
                             break
-                        match_order = self.skiplist.insertPrice(best_bid).orders.getOldestOrder()
+                        match_orders = self.skiplist.insertPrice(best_bid).orders
 
-                    # Execute partial fill across multiple orders if needed
-                    trade_qty = min(order.quantity, match_order.quantity)
-                    print(f"Market Order Executed: {trade_qty} @ {match_order.price}")
+                    # Match against FIFO orders until fully filled or no liquidity
+                    while order.quantity > 0 and match_orders.size > 0:
+                        match_order = match_orders.getOldestOrder()
+                        trade_qty = min(order.quantity, match_order.quantity)
+                        print(f"Market Order Executed: {trade_qty} @ {match_order.price}")
 
-                    # Update order quantities
-                    order.quantity -= trade_qty
-                    match_order.quantity -= trade_qty
+                        # Update quantities
+                        order.quantity -= trade_qty
+                        match_order.quantity -= trade_qty
 
-                    # Remove fully filled orders
-                    if match_order.quantity == 0:
-                        self.cancelOrder(match_order.orderId)
+                        # Remove fully filled orders
+                        if match_order.quantity == 0:
+                            match_orders.removeOrder(match_order)
+                            self.cancelOrder(match_order.orderId)
 
-                    # Update best bid/ask prices if necessary
-                    best_bid = self.get_best_bid()
-                    best_ask = self.get_best_ask()
+                    # Remove the Market Order if fully executed
+                    if order.quantity == 0:
+                        self.cancelOrder(order.orderId)
+
 
                 # If the order is fully executed, remove it
                 if order.quantity == 0:
                     self.cancelOrder(order.orderId)
 
-        # 3. Execute Limit Orders Only at Set Price or Better (Partial Fills + FIFO)
-        while best_bid and best_ask and best_bid >= best_ask:
-            bid_orders = self.skiplist.insertPrice(best_bid).orders
-            ask_orders = self.skiplist.insertPrice(best_ask).orders
+        # 3. Execute LIMIT Orders Only at Set Price or Better (Partial Fills + FIFO)
+        """ 
+        Execute Limit Orders:
+            - Fill orders at the limit price or better
+            - Execute partial fills across multiple orders
+        """
+        if order.side == "BUY":
+            while order.quantity > 0:
+                best_ask = self.getBestAsk()
+                if best_ask is None or best_ask > order.price:
+                    break
+                ask_orders = self.skiplist.insertPrice(best_ask).orders
 
-            # Match orders in FIFO order until one side is empty
-            while bid_orders.size > 0 and ask_orders.size > 0:
-                bid_order = bid_orders.getOldestOrder()
-                ask_order = ask_orders.getOldestOrder()
+                # Match until order is fully filled or no more orders available
+                while order.quantity > 0 and ask_orders.size > 0:
+                    match_order = ask_orders.getOldestOrder()
+                    trade_qty = min(order.quantity, match_order.quantity)
+                    print(f"Limit Order Executed: {trade_qty} @ {best_ask}")
 
-                # Execute as much as possible (partial fill allowed)
-                trade_qty = min(bid_order.quantity, ask_order.quantity)
-                print(f"Limit Order Executed: {trade_qty} @ {best_bid}")
+                    # Update quantities
+                    order.quantity -= trade_qty
+                    match_order.quantity -= trade_qty
 
-                # Update quantities
-                bid_order.quantity -= trade_qty
-                ask_order.quantity -= trade_qty
+                    # Remove fully filled orders
+                    if match_order.quantity == 0:
+                        ask_orders.removeOrder(match_order)
+                        self.cancelOrder(match_order.orderId)
 
-                # Remove fully filled orders from the order book
-                if bid_order.quantity == 0:
-                    bid_orders.removeOrder(bid_order)
-                    self.cancelOrder(bid_order.orderId)
+                if order.quantity == 0:
+                    self.cancelOrder(order.orderId)
+        else:
+            while order.quantity > 0:
+                best_bid = self.getBestBid()
+                if best_bid is None or best_bid < order.price:
+                    break
+                bid_orders = self.skiplist.insertPrice(best_bid).orders
 
-                if ask_order.quantity == 0:
-                    ask_orders.removeOrder(ask_order)
-                    self.cancelOrder(ask_order.orderId)
+                # Match until order is fully filled or no more orders available
+                while order.quantity > 0 and bid_orders.size > 0:
+                    match_order = bid_orders.getOldestOrder()
+                    trade_qty = min(order.quantity, match_order.quantity)
+                    print(f"Limit Order Executed: {trade_qty} @ {best_bid}")
 
-            # Update best bid/ask prices after each match
-            best_bid = self.get_best_bid()
-            best_ask = self.get_best_ask()
+                    # Update quantities
+                    order.quantity -= trade_qty
+                    match_order.quantity -= trade_qty
+
+                    # Remove fully filled orders
+                    if match_order.quantity == 0:
+                        bid_orders.removeOrder(match_order)
+                        self.cancelOrder(match_order.orderId)
+
+                if order.quantity == 0:
+                    self.cancelOrder(order.orderId)
+
+'''
+Dunder main function, so that if you import orderbook.py in your test file, 
+it won't execute code.
+'''
+if __name__ == "__main__":
+    print("Order Book Module Loaded. Run tests using `python -m unittest test_orderbook.py`")
