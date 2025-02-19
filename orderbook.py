@@ -61,7 +61,7 @@ FIFO execution at the DLL level:
 class OrderList:
     def __init__(self):
         self.head = None # represents the oldest order with FIFO logic
-        self.prev = None # represents the newest order with FIFO logic
+        self.tail = None # represents the newest order with FIFO logic
         self.size = 0 # to pre-define that initial size of the DLL is 0.
 
     def addOrder(self, order):
@@ -77,18 +77,19 @@ class OrderList:
         self.size += 1
 
     def removeOrder(self, order):
-        ''' Remove order from anywhere in the list. '''
-        # simple pointer updation after node removals
-        if order.prev:
-            order.prev.next = order.next
-        if order.next:
-            order,next.prev = order.prev
-        if order == self.head:
+        if order == self.head and order == self.tail:  # If it's the only order
+            self.head = self.tail = None
+        elif order == self.head:  # Removing head
             self.head = order.next
-        if order ==self.tail:
+            self.head.prev = None
+        elif order == self.tail:  # Removing tail
             self.tail = order.prev
-        # implement complete order removal
-        order.next = order.prev = None
+            self.tail.next = None
+        else:  # Removing from the middle
+            order.prev.next = order.next
+            order.next.prev = order.prev
+        
+        order.next = order.prev = None  # Clean references
         self.size -= 1
 
     def getOldestOrder(self):
@@ -111,9 +112,9 @@ preferred over a BST because, BST needs rebalancing (O(log n) worst case);
 Skip List has better memory locality & simpler structure.
 '''
 class SkipListNode:
-    def __init__(self, price, OrderList):
+    def __init__(self, price):
         self.price = price
-        self.orders = OrderList
+        self.orders = OrderList()
         self.forward = []
 
 class SkipList:
@@ -144,8 +145,9 @@ class SkipList:
         if current.forward[0] and current.forward[0].price == price:
             return current.forward[0]  # Price already exists
 
-        new_level = self._random_level()
+        new_level = self.randomLevel()
         new_node = SkipListNode(price)
+        new_node.orders = OrderList()
         new_node.forward = [None] * new_level
 
         for i in range(new_level):
@@ -176,73 +178,128 @@ class OrderBook:
 
     def addOrder(self, order):
         ''' Add an order to the OrderBook. '''
-        price_node = self.skip_list.insert_price(order.price) # instantiate a node for the skiplist
+        price_node = self.skiplist.insert_price(order.price) # instantiate a node for the skiplist
         price_node.orders.add_order(order) # like a vector pushback function call
         self.orders[order.orderId] = order  # Store in HashMap
 
     def cancelOrder(self, orderId):
-        ''' Remove an order with a given referrence orderId. '''
-        if orderId in self.orders: # if the order actually exists in the set. o(1) lookup
+        ''' Remove an order and clean up price levels. '''
+        if orderId in self.orders:
             order = self.orders[orderId]
-            price_node = self.skip_list.insert_price(order.price)
-            price_node.orders.remove_order(order)
-            del self.orders[orderId]  # Remove from HashMap
+            price_node = self.skiplist.insertPrice(order.price)
 
-    def matchOrders(self):
-        """ Match orders while considering order types (Limit, Market, Stop). """
-    
-        best_bid = self.skip_list.get_best_bid()
-        best_ask = self.skip_list.get_best_ask()
+            # Remove order
+            price_node.orders.removeOrder(order)
+            del self.orders[orderId]
 
-        # 1. Market Orders: Execute Immediately at Best Price Available
-        for order in list(self.orders.values()):  # Loop through all active orders
-            if order.order_type == "MARKET":
-                if order.side == "BUY":
-                    if best_ask is None:
-                        print(f"Market BUY order {order.orderId} rejected: No available sellers")
-                        continue
-                    match_order = self.orders[best_ask]
-                else:  # SELL Market Order
-                    if best_bid is None:
-                        print(f"Market SELL order {order.orderId} rejected: No available buyers")
-                        continue
-                    match_order = self.orders[best_bid]
+            # If no more orders exist at this price, remove the price level
+            if price_node.orders.size == 0:
+                self.removePriceLevel(order.price)
 
-                # Execute Market Order at best price
-                trade_qty = min(order.quantity, match_order.quantity)
-                print(f"Market Order Executed: {trade_qty} @ {match_order.price}")
+    def removePriceLevel(self, price):
+        ''' Removes a price level from the Skip List '''
+        update = [None] * self.skiplist.max_level
+        current = self.skiplist.head
 
-                # Update order quantities or remove fully filled orders
-                order.quantity -= trade_qty
-                match_order.quantity -= trade_qty
+        for i in reversed(range(self.skiplist.max_level)):
+            while current.forward[i] and current.forward[i].price < price:
+                current = current.forward[i]
+            update[i] = current
 
-                if order.quantity == 0:
-                    self.cancel_order(order.orderId)
-                if match_order.quantity == 0:
-                    self.cancel_order(match_order.orderId)
+        if current.forward[0] and current.forward[0].price == price:
+            for i in range(len(current.forward[0].forward)):
+                update[i].forward[i] = current.forward[0].forward[i]
 
-        # 2. Limit Orders: Execute Only at Set Price or Better
-        if best_bid and best_ask and best_bid >= best_ask:
-            bid_order = self.orders[best_bid]
-            ask_order = self.orders[best_ask]
 
-            trade_qty = min(bid_order.quantity, ask_order.quantity)
-            print(f"Limit Order Executed: {trade_qty} @ {best_bid}")
+    def match_orders(self):
+        """ 
+        Match orders with:
+            - Partial fills (across multiple orders in FIFO order)
+            - Limit orders
+            - Market orders
+            - Stop orders
+        """
 
-            bid_order.quantity -= trade_qty
-            ask_order.quantity -= trade_qty
+        best_bid = self.get_best_bid()
+        best_ask = self.get_best_ask()
 
-            if bid_order.quantity == 0:
-                self.cancel_order(bid_order.orderId)
-            if ask_order.quantity == 0:
-                self.cancel_order(ask_order.orderId)
+        if best_bid is None or best_ask is None:
+            return  # No trades possible
 
-        # 3. Stop Orders: Convert to Market Orders When Triggered
+        # 1. Convert Stop Orders to Market Orders if Triggered
         for order in list(self.orders.values()):
-            if order.order_type == "STOP":
+            if order.orderType == "STOP":
                 if order.side == "BUY" and best_ask and order.price <= best_ask:
-                    print(f"Stop BUY triggered @ {order.price}, converting to MARKET order")
-                    order.order_type = "MARKET"
+                    print(f"Stop BUY Order {order.orderId} triggered at {order.price}, converting to MARKET")
+                    order.orderType = "MARKET"
                 elif order.side == "SELL" and best_bid and order.price >= best_bid:
-                    print(f"Stop SELL triggered @ {order.price}, converting to MARKET order")
-                    order.order_type = "MARKET"
+                    print(f"Stop SELL Order {order.orderId} triggered at {order.price}, converting to MARKET")
+                    order.orderType = "MARKET"
+
+        # 2. Execute Market Orders Immediately at Best Price (with partial fills)
+        for order in list(self.orders.values()):
+            if order.orderType == "MARKET":
+                while order.quantity > 0:  # Loop until the market order is fully filled
+                    if order.side == "BUY":
+                        best_ask = self.get_best_ask()
+                        if best_ask is None:
+                            print(f"Market BUY Order {order.orderId} partially filled, remaining quantity: {order.quantity}")
+                            break
+                        match_order = self.skiplist.insertPrice(best_ask).orders.getOldestOrder()
+                    else:  # SELL Market Order
+                        best_bid = self.get_best_bid()
+                        if best_bid is None:
+                            print(f"Market SELL Order {order.orderId} partially filled, remaining quantity: {order.quantity}")
+                            break
+                        match_order = self.skiplist.insertPrice(best_bid).orders.getOldestOrder()
+
+                    # Execute partial fill across multiple orders if needed
+                    trade_qty = min(order.quantity, match_order.quantity)
+                    print(f"Market Order Executed: {trade_qty} @ {match_order.price}")
+
+                    # Update order quantities
+                    order.quantity -= trade_qty
+                    match_order.quantity -= trade_qty
+
+                    # Remove fully filled orders
+                    if match_order.quantity == 0:
+                        self.cancelOrder(match_order.orderId)
+
+                    # Update best bid/ask prices if necessary
+                    best_bid = self.get_best_bid()
+                    best_ask = self.get_best_ask()
+
+                # If the order is fully executed, remove it
+                if order.quantity == 0:
+                    self.cancelOrder(order.orderId)
+
+        # 3. Execute Limit Orders Only at Set Price or Better (Partial Fills + FIFO)
+        while best_bid and best_ask and best_bid >= best_ask:
+            bid_orders = self.skiplist.insertPrice(best_bid).orders
+            ask_orders = self.skiplist.insertPrice(best_ask).orders
+
+            # Match orders in FIFO order until one side is empty
+            while bid_orders.size > 0 and ask_orders.size > 0:
+                bid_order = bid_orders.getOldestOrder()
+                ask_order = ask_orders.getOldestOrder()
+
+                # Execute as much as possible (partial fill allowed)
+                trade_qty = min(bid_order.quantity, ask_order.quantity)
+                print(f"Limit Order Executed: {trade_qty} @ {best_bid}")
+
+                # Update quantities
+                bid_order.quantity -= trade_qty
+                ask_order.quantity -= trade_qty
+
+                # Remove fully filled orders from the order book
+                if bid_order.quantity == 0:
+                    bid_orders.removeOrder(bid_order)
+                    self.cancelOrder(bid_order.orderId)
+
+                if ask_order.quantity == 0:
+                    ask_orders.removeOrder(ask_order)
+                    self.cancelOrder(ask_order.orderId)
+
+            # Update best bid/ask prices after each match
+            best_bid = self.get_best_bid()
+            best_ask = self.get_best_ask()
