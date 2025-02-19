@@ -51,6 +51,7 @@ class Order:
         self.prev = None
 
     # how to represent an order in the form of a string:
+    # keep for debugging, but remove remove if I am logging everything into SQL.
     def __repr__(self):
         return f"Order(ID={self.orderId}, {self.side}, {self.quantity}@{self.price})"
     
@@ -59,4 +60,45 @@ FIFO execution at the DLL level:
 '''
 class OrderList:
     def __init__(self):
-        pass
+        self.head = None # represents the oldest order with FIFO logic
+        self.prev = None # represents the newest order with FIFO logic
+        self.size = 0 # to pre-define that initial size of the DLL is 0.
+
+    def addOrder(self, order):
+        ''' Add order to the end of the doubly linked list (FIFO queue). '''
+        # if DLL is empty:
+        if not self.head:
+            self.head = self.tail = order # first order entry of the DLL
+        else:
+            # updating the tail pointer to the newest order.
+            self.tail.next = order
+            order.prev = self.tail
+            self.tail = order
+        self.size += 1
+
+    def removeOrder(self, order):
+        ''' Remove order from anywhere in the list. '''
+        # simple pointer updation after node removals
+        if order.prev:
+            order.prev.next = order.next
+        if order.next:
+            order,next.prev = order.prev
+        if order == self.head:
+            self.head = order.next
+        if order ==self.tail:
+            self.tail = order.prev
+        # implement complete order removal
+        order.next = order.prev = None
+        self.size -= 1
+
+    def getOldestOrder(self):
+        """ Get the first (FIFO) order for execution. """
+        return self.head
+    
+    def __repr__(self):
+        orders = []
+        current = self.head
+        while current:
+            orders.append(str(current))
+            current = current.next
+        return " -> ".join(orders) if orders else "No Orders"
