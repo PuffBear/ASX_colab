@@ -102,3 +102,52 @@ class OrderList:
             orders.append(str(current))
             current = current.next
         return " -> ".join(orders) if orders else "No Orders"
+    
+'''
+Price level storage execution using a skiplist.
+Benefits:
+O(log n) insert, delete, and lookup (better cache efficiency than BST)
+preferred over a BST because, BST needs rebalancing (O(log n) worst case); 
+Skip List has better memory locality & simpler structure.
+'''
+class SkipListNode:
+    def __init__(self, price, OrderList):
+        self.price = price
+        self.orders = OrderList
+        self.forward = []
+
+class SkipList:
+    def __init__(self, max_level = 16, p = 0.5):
+        self.max_level = max_level
+        self.p = p
+        self.head = SkipListNode(-float('inf'))
+        self.head.forward = [None]*self.max_level
+
+    def randomLevel(self):
+        level = 1
+        while random.random()<self.p and level<self.max_level:
+            level += 1
+        return level
+    
+    def insertPrice(self, price):
+        ''' Insert a new prive level into the skiplist. '''
+        update = [None] * self.max_level
+        current = self.head
+
+        for i in reversed(range(self.max_level)):
+            while current.forward[i] and current.forward[i].price < price:
+                current = current.forward[i]
+            update[i] = current
+
+        if current.forward[0] and current.forward[0].price == price:
+            return current.forward[0]  # Price already exists
+
+        new_level = self._random_level()
+        new_node = SkipListNode(price)
+        new_node.forward = [None] * new_level
+
+        for i in range(new_level):
+            new_node.forward[i] = update[i].forward[i]
+            update[i].forward[i] = new_node
+
+        return new_node
