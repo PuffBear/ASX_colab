@@ -174,8 +174,8 @@ class SkipList:
     
     def removePriceLevel(self, price):
         """ Removes a price level from the Skip List """
-        update = [None] * self.skiplist.max_level
-        current = self.skiplist.head
+        update = [None] * self.max_level
+        current = self.head
 
         for i in reversed(range(self.max_level)):
             while current.forward[i] and current.forward[i].price < price:
@@ -183,11 +183,11 @@ class SkipList:
             update[i] = current
 
         if current.forward[0] and current.forward[0].price == price:
-            for i in range(len(current.forward[0].forward)):
-                # Only update if forward pointers exist
-                if update[i] and update[i].forward[i]:
-                    update[i].forward[i] = current.forward[0].forward[i]
-
+            node_to_remove = current.forward[0]
+            for i in range(len(node_to_remove.forward)):
+                if update[i]:  # ✅ Ensure update[i] is not None
+                    update[i].forward[i] = node_to_remove.forward[i] if i < len(node_to_remove.forward) else None
+            print(f"Price level {price} removed from SkipList")
     
 '''
 Create an OrderBook using a hashset, for efficient lookup addition, deletion. 
@@ -277,7 +277,7 @@ class OrderBook:
         # 🔹 BUY Order Logic
         if order.side == "BUY":
             while order.quantity > 0:
-                best_ask_price = self.best_ask()
+                best_ask_price = self.get_best_ask()
                 if best_ask_price is None or best_ask_price > order.price:
                     break  # No matching SELL orders within price limit
                 
@@ -293,7 +293,7 @@ class OrderBook:
         # 🔹 SELL Order Logic
         else:
             while order.quantity > 0:
-                best_bid_price = self.best_bid()
+                best_bid_price = self.get_best_bid()
                 if best_bid_price is None or best_bid_price < order.price:
                     break  # No matching BUY orders within price limit
 
