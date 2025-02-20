@@ -25,15 +25,11 @@ def interactive_order_matching():
                 orderType="LIMIT"
             )
 
-            # ✅ Add order to the order book
-            print("adding order.") # for debuggin purposes
+            # ✅ Add order to the order boo
             order_book.add_limit_order(order)
-            print("added order.") # for debuggin purposes
 
             # ✅ Attempt to match the order
-            print("matching order.") # for debuggin purposes
             order_book.matchOrder(order)
-            print("matched order.") # for debuggin purposes
 
             # ✅ Always print the order books after each input
             print_order_books(order_book)

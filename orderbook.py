@@ -244,7 +244,9 @@ class OrderBook:
 
         # ✅ Update LTP after every trade
         self.ltp = trade_price
+        print("======xxxxxxx======")
         print(f"🔥 LTP Updated: {self.ltp}")
+        print("======xxxxxxx======")
 
         # ✅ Record the trade
         self.trades.append((order.orderId, match_order.orderId, trade_price, trade_qty))
