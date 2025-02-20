@@ -1,7 +1,22 @@
 import unittest
 from ORDERBOOK.orderbook import Order, OrderBook
 
+
 class TestOrderBook(unittest.TestCase):
+
+    def print_order_books(self, order_book):
+        """Print Bids and Asks books after each order input."""
+        print("\n--- BIDS BOOK ---")
+        current = order_book.bids.head.forward[0]
+        while current:
+            print(f"Price: {current.price}, Quantity: {current.orders.size}")
+            current = current.forward[0]
+
+        print("\n--- ASKS BOOK ---")
+        current = order_book.asks.head.forward[0]
+        while current:
+            print(f"Price: {current.price}, Quantity: {current.orders.size}")
+            current = current.forward[0]
 
     def test_fifo_execution(self):
         """Test FIFO execution with multiple orders at same and different price levels"""
@@ -11,17 +26,30 @@ class TestOrderBook(unittest.TestCase):
 
         # ✅ Add BUY Orders (Random Order)
         order_book.add_limit_order(Order(orderSide="BUY", price=100, quantity=5, orderType="LIMIT"))
+        self.print_order_books(order_book)
+
         order_book.add_limit_order(Order(orderSide="BUY", price=101, quantity=3, orderType="LIMIT"))
+        self.print_order_books(order_book)
+
         order_book.add_limit_order(Order(orderSide="BUY", price=100, quantity=4, orderType="LIMIT"))
+        self.print_order_books(order_book)
+
         order_book.add_limit_order(Order(orderSide="BUY", price=102, quantity=2, orderType="LIMIT"))
+        self.print_order_books(order_book)
 
         # ✅ Add SELL Orders (Random Order)
         order_book.add_limit_order(Order(orderSide="SELL", price=100, quantity=6, orderType="LIMIT"))
+        self.print_order_books(order_book)
+
         order_book.add_limit_order(Order(orderSide="SELL", price=101, quantity=5, orderType="LIMIT"))
+        self.print_order_books(order_book)
+
         order_book.add_limit_order(Order(orderSide="SELL", price=102, quantity=3, orderType="LIMIT"))
+        self.print_order_books(order_book)
 
         # ✅ Match Orders
         order_book.matchOrder(Order(orderSide="BUY", price=102, quantity=14, orderType="LIMIT"))
+        self.print_order_books(order_book)
 
         # ✅ Verify Trades:
         # - Orders @ 100: BUY (5 + 4) vs SELL (6) → Trades: 5 + 1

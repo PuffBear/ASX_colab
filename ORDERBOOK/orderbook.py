@@ -3,9 +3,7 @@ The orderbook structure is as such:
 OrderSide
 Price (levels)
 Quantity
-Timestamp
-MarketDepth
-Total Traded Volume
+Timestamp ( to be done)
 OrderType: Limit; Stop; Market; FillOrKill(FOC); Good-till-Cancelled(GTC)
 
 orders are sent to the order book using such a self built data structure:
