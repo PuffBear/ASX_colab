@@ -206,6 +206,7 @@ class OrderBook:
         self.asks = SkipList() # for sell orders (min price first)
         self.orders = {} # create a hashset for orderId lookup.
         self.trades = []
+        self.ltp = None # adding an ltp attribute
 
     # helper function to add a limit order:
     def add_limit_order(self, order):
@@ -240,6 +241,10 @@ class OrderBook:
         """Execute a trade between two orders."""
         trade_price = match_order.price
         print(f"Trade Executed: {trade_qty} @ {trade_price}")
+
+        # ✅ Update LTP after every trade
+        self.ltp = trade_price
+        print(f"🔥 LTP Updated: {self.ltp}")
 
         # ✅ Record the trade
         self.trades.append((order.orderId, match_order.orderId, trade_price, trade_qty))
