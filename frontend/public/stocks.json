@@ -1,0 +1,22 @@
+[
+  { "name": "Apple", "price": 182.50 },
+  { "name": "Microsoft", "price": 415.30 },
+  { "name": "Tesla", "price": 199.90 },
+  { "name": "Amazon", "price": 156.75 },
+  { "name": "Google", "price": 2850.40 },
+  { "name": "Meta", "price": 475.60 },
+  { "name": "Nvidia", "price": 726.15 },
+  { "name": "Netflix", "price": 465.20 },
+  { "name": "Adobe", "price": 650.55 },
+  { "name": "Intel", "price": 42.80 },
+  { "name": "AMD", "price": 152.30 },
+  { "name": "Salesforce", "price": 283.75 },
+  { "name": "PayPal", "price": 72.50 },
+  { "name": "Uber", "price": 68.40 },
+  { "name": "Visa", "price": 256.85 },
+  { "name": "Mastercard", "price": 425.10 },
+  { "name": "Boeing", "price": 192.30 },
+  { "name": "Disney", "price": 98.20 },
+  { "name": "Coca-Cola", "price": 59.80 },
+  { "name": "Pepsi", "price": 180.25 }
+]
