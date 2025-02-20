@@ -242,15 +242,17 @@ class OrderBook:
 
         # ✅ Remove fully filled orders
         if match_order.quantity == 0:
-            self.cancelOrder(match_order.orderId)
+            self.cancelOrder(match_order.orderId, check_price_level=True)
         if order.quantity == 0:
-            self.cancelOrder(order.orderId)
+            self.cancelOrder(order.orderId, check_price_level=True)
 
-    # ✅ Cancel an Order
+
     def cancelOrder(self, orderId):
-        """Cancel an order and remove it from the order book."""
+        """Cancel an order and remove the price level if empty."""
         if orderId in self.orders:
             order = self.orders[orderId]
+
+            # Identify whether it's a BUY or SELL order
             if order.side == "BUY":
                 price_node = self.bids.insertPrice(order.price)
             else:
@@ -260,14 +262,25 @@ class OrderBook:
             price_node.orders.removeOrder(order)
             del self.orders[orderId]
 
-            # ✅ Remove the price level if no more orders exist
-            if price_node.orders.size == 0:
-                if order.side == "BUY":
-                    self.bids.removePriceLevel(order.price)
-                else:
-                    self.asks.removePriceLevel(order.price)
+            # ✅ Check if the price level is empty
+            self.check_price_level(order.side, order.price)
 
             print(f"Order {orderId} cancelled")
+
+    
+    def check_price_level(self, side, price):
+        """Remove the price level from the skip list if it's empty."""
+        if side == "BUY":
+            price_node = self.bids.insertPrice(price)
+            if price_node.orders.size == 0:
+                self.bids.removePriceLevel(price)
+                print(f"✅ Price level {price} removed from BUY book")
+        else:
+            price_node = self.asks.insertPrice(price)
+            if price_node.orders.size == 0:
+                self.asks.removePriceLevel(price)
+                print(f"✅ Price level {price} removed from SELL book")
+
 
 
     def matchOrder(self, order):
