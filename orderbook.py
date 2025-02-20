@@ -22,6 +22,7 @@ quote = {'type' : 'market',
 
 '''
 import time, random, itertools, threading
+from threading import Lock
 
 '''
 Defining individual orders.
@@ -122,7 +123,7 @@ class SkipListNode:
         self.lock = threading.Lock() # this is a lock for concurrent access.
 
 class SkipList:
-    def __init__(self, max_level = 16, p = 0.5):
+    def __init__(self, max_level = 32, p = 0.5):
         self.max_level = max_level
         self.p = p
         self.head = SkipListNode(-float('inf'))
@@ -244,9 +245,17 @@ class OrderBook:
 
         # ✅ Update LTP after every trade
         self.ltp = trade_price
+        print("-------------------")
+        print("|                 |")
+        print("|                 |")
+        print("|                 |")
         print("======xxxxxxx======")
-        print(f"🔥 LTP Updated: {self.ltp}")
+        print(f"LTP Updated: {self.ltp}")
         print("======xxxxxxx======")
+        print("|                 |")
+        print("|                 |")
+        print("|                 |")
+        print("-------------------")
 
         # ✅ Record the trade
         self.trades.append((order.orderId, match_order.orderId, trade_price, trade_qty))
@@ -282,8 +291,6 @@ class OrderBook:
                 current.quantity = order.quantity  # ✅ Update quantity in FIFO queue
                 return
             current = current.next
-
-
 
 
     def cancelOrder(self, orderId, check_price_level=False):
@@ -413,7 +420,7 @@ class OrderBook:
             self.add_limit_order(order)
 
     def matchAllOrders(self):
-        """Continuously match orders until no valid cross exists."""
+        """Continuously match orders until no valid cross exists, with thread safety."""
         while True:
             best_bid_price = self.get_best_bid()
             best_ask_price = self.get_best_ask()
