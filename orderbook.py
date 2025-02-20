@@ -21,7 +21,7 @@ quote = {'type' : 'market',
          'trade_id' : 002}
 
 '''
-import time, random, itertools
+import time, random, itertools, threading
 
 '''
 Defining individual orders.
@@ -119,6 +119,7 @@ class SkipListNode:
         self.price = price
         self.orders = OrderList()
         self.forward = []
+        self.lock = threading.Lock() # this is a lock for concurrent access.
 
 class SkipList:
     def __init__(self, max_level = 16, p = 0.5):
@@ -136,7 +137,7 @@ class SkipList:
         return level
     
     def insertPrice(self, price):
-        ''' Insert a new prive level into the skiplist. '''
+        """Insert a new price level into the skiplist only if it doesn't already exist."""
         update = [None] * self.max_level
         current = self.head
 
@@ -145,9 +146,11 @@ class SkipList:
                 current = current.forward[i]
             update[i] = current
 
+        # ✅ Return the existing node if found
         if current.forward[0] and current.forward[0].price == price:
-            return current.forward[0]  # Price already exists
+            return current.forward[0]
 
+        # ✅ Insert a new node if price level doesn't exist
         new_level = self.randomLevel()
         new_node = SkipListNode(price)
         new_node.orders = OrderList()
@@ -158,6 +161,8 @@ class SkipList:
             update[i].forward[i] = new_node
 
         return new_node
+
+
     
     def getBestBid(self):
         ''' Funciton to get the best bid/buy side order in the skiplist. '''
@@ -204,15 +209,21 @@ class OrderBook:
 
     # helper function to add a limit order:
     def add_limit_order(self, order):
-        """Add a limit order to the order book."""
+        """Add an order to the order book."""
         if order.side == "BUY":
             price_node = self.bids.insertPrice(order.price)
         else:
             price_node = self.asks.insertPrice(order.price)
 
-        price_node.orders.addOrder(order)
-        self.orders[order.orderId] = order
-        print(f"Added LIMIT Order: {order.side} {order.quantity} @ {order.price}")
+        # ✅ Only add order if it's not already in the order book
+        if order.orderId not in self.orders:
+            price_node.orders.addOrder(order)
+            self.orders[order.orderId] = order
+            print(f"Added LIMIT Order: {order.side} {order.quantity} @ {order.price}")
+
+        # ✅ Continuously match orders after each insertion
+        self.matchAllOrders()
+
 
     # gives the highest buy price order
     def get_best_bid(self):
@@ -225,27 +236,50 @@ class OrderBook:
         return self.asks.getBestAsk()
     
     
-    # Execute a Trade Between Two Orders
     def execute_trade(self, order, match_order, trade_qty):
         """Execute a trade between two orders."""
         trade_price = match_order.price
         print(f"Trade Executed: {trade_qty} @ {trade_price}")
-        
-        # Record the trade
+
+        # ✅ Record the trade
         self.trades.append((order.orderId, match_order.orderId, trade_price, trade_qty))
 
-        # Update quantities
+        # ✅ Update Quantities
         order.quantity -= trade_qty
         match_order.quantity -= trade_qty
 
-        # ✅ Remove fully filled orders
+        # ✅ Correct Behavior for Partial Fills
         if match_order.quantity == 0:
-            self.cancelOrder(match_order.orderId, check_price_level=True)
+            self.cancelOrder(match_order.orderId)  # ✅ Fully filled, remove from order book
+        else:
+            self.update_order_quantity(match_order)  # ✅ Partial fill, update quantity
+
         if order.quantity == 0:
-            self.cancelOrder(order.orderId, check_price_level=True)
+            self.cancelOrder(order.orderId)  # ✅ Fully filled, remove from order book
+        else:
+            self.update_order_quantity(order)  # ✅ Partial fill, update quantity
 
 
-    def cancelOrder(self, orderId):
+    def update_order_quantity(self, order):
+        """Update the quantity of an order without removing it."""
+        # ✅ Locate the correct price node
+        if order.side == "BUY":
+            price_node = self.bids.insertPrice(order.price)
+        else:
+            price_node = self.asks.insertPrice(order.price)
+
+        # ✅ Traverse FIFO queue to update the order's quantity
+        current = price_node.orders.head
+        while current:
+            if current.orderId == order.orderId:
+                current.quantity = order.quantity  # ✅ Update quantity in FIFO queue
+                return
+            current = current.next
+
+
+
+
+    def cancelOrder(self, orderId, check_price_level=False):
         """Cancel an order and remove the price level if empty."""
         if orderId in self.orders:
             order = self.orders[orderId]
@@ -261,9 +295,11 @@ class OrderBook:
             del self.orders[orderId]
 
             # ✅ Check if the price level is empty
-            self.check_price_level(order.side, order.price)
+            if check_price_level:
+                self.check_price_level(order.side, order.price)
 
             print(f"Order {orderId} cancelled")
+
 
     
     def check_price_level(self, side, price):
@@ -280,46 +316,124 @@ class OrderBook:
                 print(f"✅ Price level {price} removed from SELL book")
 
 
-
     def matchOrder(self, order):
-        # ✅ Match Orders With Partial Filling (Limit Orders Only)
         """Match limit orders with partial fills, using FIFO logic."""
 
         # 🔹 BUY Order Logic
         if order.side == "BUY":
             while order.quantity > 0:
                 best_ask_price = self.get_best_ask()
+                # ✅ Exit if no matching SELL orders
                 if best_ask_price is None or best_ask_price > order.price:
-                    break  # No matching SELL orders within price limit
-                
-                ask_node = self.asks.insertPrice(best_ask_price)
-                ask_orders = ask_node.orders
+                    # ✅ No match found - add order to the book
+                    self.add_limit_order(order)
+                    return
 
-                # Loop through FIFO queue of SELL orders
-                while order.quantity > 0 and ask_orders.size > 0:
-                    match_order = ask_orders.getOldestOrder()
-                    trade_qty = min(order.quantity, match_order.quantity)
-                    self.execute_trade(order, match_order, trade_qty)
+                ask_node = self.asks.head.forward[0]
+                matched = False  # ✅ Track if the order is matched
+
+                while ask_node and ask_node.price <= order.price:
+                    if ask_node.orders.size == 0:
+                        break
+
+                    with ask_node.lock:
+                        ask_orders = ask_node.orders
+                        while order.quantity > 0 and ask_orders.size > 0:
+                            match_order = ask_orders.getOldestOrder()
+                            trade_qty = min(order.quantity, match_order.quantity)
+                            self.execute_trade(order, match_order, trade_qty)
+                            matched = True
+
+                            if order.quantity == 0:
+                                break
+
+                        if ask_orders.size == 0:
+                            ask_node = ask_node.forward[0]
+                        else:
+                            break
+
+                    if order.quantity == 0 or ask_node is None:
+                        break
+
+                # ✅ If no match found, add order to the book
+                if not matched and order.quantity > 0:
+                    self.add_limit_order(order)
+                    return
 
         # 🔹 SELL Order Logic
         else:
             while order.quantity > 0:
                 best_bid_price = self.get_best_bid()
+                # ✅ Exit if no matching BUY orders
                 if best_bid_price is None or best_bid_price < order.price:
-                    break  # No matching BUY orders within price limit
+                    # ✅ No match found - add order to the book
+                    self.add_limit_order(order)
+                    return
 
-                bid_node = self.bids.insertPrice(best_bid_price)
-                bid_orders = bid_node.orders
+                bid_node = self.bids.head.forward[0]
+                matched = False  # ✅ Track if the order is matched
 
-                # Loop through FIFO queue of BUY orders
-                while order.quantity > 0 and bid_orders.size > 0:
-                    match_order = bid_orders.getOldestOrder()
-                    trade_qty = min(order.quantity, match_order.quantity)
-                    self.execute_trade(order, match_order, trade_qty)
+                while bid_node and bid_node.price >= order.price:
+                    if bid_node.orders.size == 0:
+                        break
 
-        # 🔹 If Order Is Partially Filled, Add Remaining Volume to Order Book
-        if order.quantity > 0:
+                    with bid_node.lock:
+                        bid_orders = bid_node.orders
+                        while order.quantity > 0 and bid_orders.size > 0:
+                            match_order = bid_orders.getOldestOrder()
+                            trade_qty = min(order.quantity, match_order.quantity)
+                            self.execute_trade(order, match_order, trade_qty)
+                            matched = True
+
+                            if order.quantity == 0:
+                                break
+
+                        if bid_orders.size == 0:
+                            bid_node = bid_node.forward[0]
+                        else:
+                            break
+
+                    if order.quantity == 0 or bid_node is None:
+                        break
+
+                # ✅ If no match found, add order to the book
+                if not matched and order.quantity > 0:
+                    self.add_limit_order(order)
+                    return
+
+        # ✅ If the order is partially filled, add the remaining volume to the book
+        if order.quantity > 0 and order.orderId not in self.orders:
             self.add_limit_order(order)
+
+    def matchAllOrders(self):
+        """Continuously match orders until no valid cross exists."""
+        while True:
+            best_bid_price = self.get_best_bid()
+            best_ask_price = self.get_best_ask()
+
+            # ✅ Break if no cross exists
+            if best_bid_price is None or best_ask_price is None or best_bid_price < best_ask_price:
+                break
+
+            # ✅ Get the order nodes
+            bid_node = self.bids.insertPrice(best_bid_price)
+            ask_node = self.asks.insertPrice(best_ask_price)
+
+            # ✅ Match FIFO orders at the best price
+            while bid_node.orders.size > 0 and ask_node.orders.size > 0:
+                bid_order = bid_node.orders.getOldestOrder()
+                ask_order = ask_node.orders.getOldestOrder()
+
+                # ✅ Match orders with partial fills
+                trade_qty = min(bid_order.quantity, ask_order.quantity)
+                self.execute_trade(bid_order, ask_order, trade_qty)
+
+                if bid_node.orders.size == 0:
+                    self.check_price_level("BUY", best_bid_price)
+
+                if ask_node.orders.size == 0:
+                    self.check_price_level("SELL", best_ask_price)
+
 
         
 '''

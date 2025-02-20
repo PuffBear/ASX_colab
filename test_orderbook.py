@@ -1,5 +1,5 @@
 import unittest
-from ORDERBOOK.orderbook import Order, OrderBook
+from orderbook import Order, OrderBook
 
 
 class TestOrderBook(unittest.TestCase):
