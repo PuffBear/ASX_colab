@@ -1,13 +1,21 @@
 'use client';
 import { Button } from '@nextui-org/react';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { signIn, signOut, useSession } from "next-auth/react";
 
 const Navigation = () => {
 
   const [selectedTab, setselectedTab] = useState()
+  const { data: session, status } = useSession();
   const router = useRouter()
+
+  useEffect(() => {
+    if (status === "authenticated") {
+      console.log("User is logged in:", session.user);
+    }
+  }, [status, session]);
 
   const handleClick = (tab) => {
     setselectedTab(tab)
@@ -16,6 +24,11 @@ const Navigation = () => {
     else
       router.push(`/${tab}`)
   }
+
+  const handleSignOut = async () => {
+    await signOut({ redirect: false }); // Prevents NextAuth from redirecting
+    router.push('/'); // Redirects to Home manually
+  };
 
   return (
     <nav className='flex justify-center top-0 left-0 right-0'>
@@ -42,7 +55,23 @@ const Navigation = () => {
         <button onClick={() => handleClick('listings')} className={`mr-5 hover:opacity-75 transition-opacity duration-250 ${selectedTab === 'listings' ? 'text-[#8a0100]' : 'text-white'} `}>
           <h1 className="py-2 px-2 font-bold">Listings</h1>
         </button>
-        <Button color='secondary' className='font-bold rounded-full bg-clip-border border-3' style={{border: "#000516",}}>Login</Button>
+        {status === "authenticated" ? (
+          <Button 
+            color='secondary' 
+            onClick={handleSignOut} 
+            className='font-bold rounded-full bg-clip-border border-3' 
+            style={{ border: "#000516" }}>
+            Sign Out
+          </Button>
+        ) : (
+          <Button 
+            color='secondary' 
+            onClick={() => signIn("google")} 
+            className='font-bold rounded-full bg-clip-border border-3' 
+            style={{ border: "#000516" }}>
+            Sign In
+          </Button>
+        )}
       </div>
     </nav>
   )
