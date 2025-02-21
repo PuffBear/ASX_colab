@@ -42,7 +42,7 @@ export default function StockDropdown() {
     <div className="relative w-64 mb-5 ml-5" ref={dropdownRef}>
       {/* Selected Stock Button */}
       <button
-        className="px-4 py-2 bg-[#8a0100] text-white rounded-lg shadow-md focus:outline-none"
+        className="px-4 py-2 bg-[#8a0100] text-white font-bold rounded-lg shadow-md focus:outline-none"
         onClick={() => setIsOpen(!isOpen)}
       >
         {selectedStock} ▼
@@ -50,7 +50,7 @@ export default function StockDropdown() {
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute mt-2 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+        <div className="absolute mt-2 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto z-[1]">
           {stocks
             .filter((stock) => stock.name !== selectedStock) // Exclude selected stock
             .map((stock) => (
