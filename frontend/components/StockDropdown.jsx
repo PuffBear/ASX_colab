@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 
-export default function StockDropdown() {
+export default function StockDropdown({ selectedStock, setSelectedStock }) {
   const [stocks, setStocks] = useState([]);
-  const [selectedStock, setSelectedStock] = useState("Apple");
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 

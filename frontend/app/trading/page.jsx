@@ -8,19 +8,25 @@ import PlaceTrades from "@/components/PlaceTrades";
 const Page = () => {
   const chartContainerRef = useRef(null);
   const chartInstanceRef = useRef(null);
-  const [data, setData] = useState([]);
+  const [stockData, setStockData] = useState([]);
   const [chartWidth, setChartWidth] = useState(75); // Default: Chart takes 75% of the screen
+  const [selectedStock, setSelectedStock] = useState("Apple");
 
   // Load data.json immediately
   useEffect(() => {
-    fetch("/test_stock_data.json")
+    // Load stock historical data
+    fetch("/stocks_historical_data.json")
       .then((response) => response.json())
-      .then((jsonData) => setData(jsonData.initialData))
-      .catch((error) => console.error("Error loading chart data:", error));
-  }, []);
+      .then((data) => {
+        if (data[selectedStock]) {
+          setStockData(data[selectedStock]); // Filter data based on selected stock
+        }
+      })
+      .catch((error) => console.error("Error loading stock data:", error));
+  }, [selectedStock]); // Runs when selectedStock changes
 
   useEffect(() => {
-    if (!chartContainerRef.current || data.length === 0) return;
+    if (!chartContainerRef.current || stockData.length === 0) return;
 
     // Create chart instance
     const chart = createChart(chartContainerRef.current, {
@@ -39,7 +45,7 @@ const Page = () => {
 
     chartInstanceRef.current = chart;
     const newSeries = chart.addSeries(LineSeries, { color: "#2962ff" });
-    newSeries.setData(data);
+    newSeries.setData(stockData);
 
     // Resize observer
     const resizeObserver = new ResizeObserver(() => {
@@ -54,7 +60,7 @@ const Page = () => {
       resizeObserver.disconnect();
       chart.remove();
     };
-  }, [data]);
+  }, [stockData]);
 
   // Prevent Chrome Back/Forward Gesture When Dragging Chart
   useEffect(() => {
@@ -94,7 +100,7 @@ const Page = () => {
     document.removeEventListener("mouseup", handleMouseUp);
   };
 
-  const [selectedTrade, setSelectedTrade] = useState(null); 
+  const [selectedTrade, setSelectedTrade] = useState(null);
 
   return (
     <div className="flex flex-col h-screen">
@@ -102,17 +108,17 @@ const Page = () => {
       <div className="flex flex-row pt-8 pl-10 bg-gray-800 items-center">
         <h1 className="text-white ml-5 pb-4 font-bold text-xl">Choose Security</h1>
         <div className="basis-3/5">
-          <StockDropdown />
+          <StockDropdown selectedStock={selectedStock} setSelectedStock={setSelectedStock} />
         </div>
         <div className="text-white font-bold ml-20 text-xl pb-4">Account Balance</div>
         <h1 className="text-red-500 ml-5 font-bold text-2xl pb-4">$200,000</h1>
       </div>
 
       {/* Trading Section */}
-      <div className="flex flex-row flex-grow">
+      <div className="flex flex-row flex-grow z-[0]">
         {/* Chart Section */}
         <div className="bg-black p-2" style={{ width: `${chartWidth}%` }}>
-          {data.length === 0 ? (
+          {stockData.length === 0 ? (
             <div className="text-white text-center mt-10">Loading Chart...</div>
           ) : (
             <div ref={chartContainerRef} className="w-full h-full"></div>

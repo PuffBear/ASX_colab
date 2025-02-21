@@ -86,13 +86,14 @@ const PlaceTrades = ({ selectedTrade }) => {
       {/* Confirm & Cancel Buttons */}
       <div className="flex gap-2">
         <button
-          className="w-1/2 py-2 bg-blue-500 font-bold rounded-lg"
+          className="w-1/2 py-2 bg-blue-500 font-bold rounded-lg hover:bg-blue-600"
           onClick={handleConfirmTrade}
+          
         >
           Confirm
         </button>
         <button
-          className="w-1/2 py-2 bg-gray-600 font-bold rounded-lg"
+          className="w-1/2 py-2 bg-gray-600 font-bold rounded-lg hover:bg-gray-700"
           onClick={handleCancel}
         >
           Cancel
