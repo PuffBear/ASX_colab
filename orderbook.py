@@ -162,8 +162,6 @@ class SkipList:
             update[i].forward[i] = new_node
 
         return new_node
-
-
     
     def getBestBid(self):
         ''' Funciton to get the best bid/buy side order in the skiplist. '''
@@ -314,7 +312,6 @@ class OrderBook:
 
             print(f"Order {orderId} cancelled")
 
-
     
     def check_price_level(self, side, price):
         """Remove the price level from the skip list if it's empty."""
@@ -447,6 +444,38 @@ class OrderBook:
 
                 if ask_node.orders.size == 0:
                     self.check_price_level("SELL", best_ask_price)
+
+# multi security OrderBook, which basically creates instances of orderbooks for the securities
+class MultiSecurityOrderBook:
+    def __init__(self):
+        """Initialize order books for AAPL, TSLA, and MSFT."""
+        self.order_books = {
+            "AAPL": OrderBook(),
+            "TSLA": OrderBook(),
+            "MSFT": OrderBook()
+        }
+
+    def get_or_create_order_book(self, symbol):
+        """Get the order book for a specific security or return None if it doesn't exist."""
+        return self.order_books.get(symbol, None)
+
+    def add_order(self, symbol, order):
+        """Add order to the specific order book of a security if it exists."""
+        order_book = self.get_or_create_order_book(symbol)
+        if order_book:
+            order_book.add_limit_order(order)
+            order_book.matchAllOrders()
+            return f"Order added to {symbol}"
+        else:
+            return f"Error: {symbol} is not a valid security"
+
+    def get_order_book(self, symbol):
+        """Return the order book for a given security or None if it doesn't exist."""
+        return self.order_books.get(symbol, None)
+
+    def list_all_securities(self):
+        """List all available securities."""
+        return list(self.order_books.keys())
 
 
         
