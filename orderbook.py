@@ -449,6 +449,7 @@ class OrderBook:
 class MultiSecurityOrderBook:
     def __init__(self):
         """Initialize order books for AAPL, TSLA, and MSFT."""
+        # creating instances, using a dictionary for each stock's orderbooks
         self.order_books = {
             "AAPL": OrderBook(),
             "TSLA": OrderBook(),
