@@ -3,8 +3,8 @@ from tkinter import ttk
 from orderbook import Order, OrderBook, MultiSecurityOrderBook
 
 # matplotlib 
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure # type: ignore
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg # type: ignore
 import time
 
 class OrderBookGUI:

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 
-const PlaceTrades = ({ selectedTrade }) => {
+const PlaceTrades = ({ selectedTrade, selectedStock }) => {
   const [tradeType, setTradeType] = useState(null); // "buy" or "sell"
   const [quantity, setQuantity] = useState("");
   const [price, setPrice] = useState("");
+  const [message, setMessage] = useState("");
 
   const accountBalance = 10000; // Example: User's balance in dollars
   const sharesOwned = 50; // Example: Number of shares user owns
@@ -21,13 +22,40 @@ const PlaceTrades = ({ selectedTrade }) => {
     }
   }, [selectedTrade]);
 
-  const handleConfirmTrade = () => {
+  const handleConfirmTrade = async () => {
     if (!tradeType || !quantity || !price) {
-      alert("Please fill all fields before confirming.");
+      setMessage({ type: "error", text: "Please fill in all fields." });
       return;
     }
-    console.log(`Trade Confirmed: ${tradeType.toUpperCase()} ${quantity} shares at $${price}`);
-    // TODO: Implement actual trade execution logic (API call or state update)
+
+    const tradeData = {
+      stock: selectedStock,
+      quantity: parseInt(quantity, 10),
+      order_side: tradeType,
+      price: parseFloat(price),
+    };
+
+    console.log("Trade Data:", tradeData); // Debugging output
+
+    try {
+        const response = await fetch("http://127.0.0.1:5000/place_trade", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(tradeData),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setMessage({ type: "success", text: `Trade placed: ${JSON.stringify(data)}` });
+      } else {
+        setMessage({ type: "error", text: `Error: ${data.error}` });
+      }
+    } catch (error) {
+      setMessage({ type: "error", text: "Failed to connect to the server." });
+    }
   };
 
   const handleCancel = () => {
@@ -38,21 +66,24 @@ const PlaceTrades = ({ selectedTrade }) => {
 
   return (
     <div className="p-4 bg-gray-900 rounded-lg text-white w-full">
-      <h2 className="text-xl font-bold mb-3">Place Trade</h2>
-
+      <div className="flex flex-row">
+        <h2 className="text-xl font-bold mb-3 basis-11/12">Place Trade</h2>
+        <h2 className="text-xl font-bold mb-3">{selectedStock}</h2>
+      </div>
+      
       {/* Buy/Sell Toggle Buttons */}
-      <div className="flex gap-2 mb-3">
+      <div className="flex flex-row gap-2 mb-3">
         <button
-          className={`w-1/2 py-2 font-bold rounded-lg ${tradeType === "buy" ? "bg-green-500" : "bg-gray-700"
+          className={`w-1/2 py-2 font-bold rounded-lg ${tradeType === "BUY" ? "bg-green-500" : "bg-gray-700"
             }`}
-          onClick={() => handleTradeType("buy")}
+          onClick={() => handleTradeType("BUY")}
         >
           Buy
         </button>
         <button
-          className={`w-1/2 py-2 font-bold rounded-lg ${tradeType === "sell" ? "bg-red-500" : "bg-gray-700"
+          className={`w-1/2 py-2 font-bold rounded-lg ${tradeType === "SELL" ? "bg-red-500" : "bg-gray-700"
             }`}
-          onClick={() => handleTradeType("sell")}
+          onClick={() => handleTradeType("SELL")}
         >
           Sell
         </button>
@@ -60,8 +91,8 @@ const PlaceTrades = ({ selectedTrade }) => {
 
       {/* Display Account Balance or Shares Owned */}
       <p className="mb-2 text-sm">
-        {tradeType === "buy" ? `Account Balance: $${accountBalance.toFixed(2)}` :
-          tradeType === "sell" ? `Shares Owned: ${sharesOwned}` :
+        {tradeType === "BUY" ? `Account Balance: $${accountBalance.toFixed(2)}` :
+          tradeType === "SELL" ? `Shares Owned: ${sharesOwned}` :
             "Select Buy or Sell"}
       </p>
 

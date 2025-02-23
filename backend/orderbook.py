@@ -54,6 +54,13 @@ class Order:
     def __repr__(self):
         return f"Order(ID={self.orderId}, {self.side}, {self.quantity}@{self.price})"
     
+    def to_dict(self):
+        return {
+            "side": self.side,
+            "price": self.price,
+            "quantity": self.quantity
+        }
+    
 '''
 FIFO execution at the DLL level:
 '''
@@ -107,6 +114,15 @@ class OrderList:
             orders.append(str(current))
             current = current.next
         return " -> ".join(orders) if orders else "No Orders"
+    
+    def to_list(self):
+        """ Convert the linked list into a list of orders. """
+        orders = []
+        current = self.head
+        while current:
+            orders.append(current.to_dict())  # Assuming Order class has a to_dict() method
+            current = current.next
+        return orders
     
 '''
 Price level storage execution using a skiplist.
@@ -191,6 +207,17 @@ class SkipList:
                     update[i].forward[i] = node_to_remove.forward[i] if i < len(node_to_remove.forward) else None
             print(f"Price level {price} removed from SkipList")
     
+    def to_list(self):
+        """ Converts SkipList into a list of (price, orders) tuples """
+        orders = []
+        current = self.head.forward[0]  # Skip the head (-inf)
+        while current:
+            price_level = current.price
+            order_list = current.orders.to_list()  # ✅ Now this will work
+            orders.append((price_level, order_list))
+            current = current.forward[0]
+        return orders
+
 '''
 Create an OrderBook using a hashset, for efficient lookup addition, deletion. 
 O(1) order retrieval.
@@ -206,6 +233,14 @@ class OrderBook:
         self.orders = {} # create a hashset for orderId lookup.
         self.trades = []
         self.ltp = None # adding an ltp attribute
+
+    def get_bids(self):
+        """Return all bid orders as a list of dicts."""
+        return self.bids.to_list()
+
+    def get_asks(self):
+        """Return all ask orders as a list of dicts."""
+        return self.asks.to_list()
 
     # helper function to add a limit order:
     def add_limit_order(self, order):
@@ -223,6 +258,17 @@ class OrderBook:
 
         # ✅ Continuously match orders after each insertion
         self.matchAllOrders()
+
+    def process_order(self, stock, quantity, order_type, price):
+    # Placeholder logic (Replace with actual order processing)
+        return {
+            "stock": stock,
+            "quantity": quantity,
+            "order_type": order_type,
+            "price": price,
+            "status": "filled"  # or "pending"
+        }
+
 
 
     # gives the highest buy price order
