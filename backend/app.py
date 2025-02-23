@@ -43,5 +43,25 @@ def process_order():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/get_orderbook/<symbol>', methods=['GET'])
+def get_orderbook(symbol):
+    try:
+        # Get the order book for the specified symbol
+        order_book = multi_security_order_book.get_order_book(symbol)
+        if not order_book:
+            return jsonify({"error": "Invalid stock symbol"}), 400
+        
+        # Get bids and asks
+        bids = order_book.get_bids()
+        asks = order_book.get_asks()
+        
+        return jsonify({
+            "bids": bids,
+            "asks": asks,
+        })
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     app.run(debug=True)

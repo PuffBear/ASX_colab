@@ -235,12 +235,30 @@ class OrderBook:
         self.ltp = None # adding an ltp attribute
 
     def get_bids(self):
-        """Return all bid orders as a list of dicts."""
-        return self.bids.to_list()
+        """Return all bid orders as a flat list of dicts."""
+        bids = self.bids.to_list()
+        flat_bids = []
+        for price, orders in bids:
+            for order in orders:
+                flat_bids.append({
+                    "price": order["price"],
+                    "quantity": order["quantity"],
+                    "side": order["side"]
+                })
+        return flat_bids
 
     def get_asks(self):
-        """Return all ask orders as a list of dicts."""
-        return self.asks.to_list()
+        """Return all ask orders as a flat list of dicts."""
+        asks = self.asks.to_list()
+        flat_asks = []
+        for price, orders in asks:
+            for order in orders:
+                flat_asks.append({
+                    "price": order["price"],
+                    "quantity": order["quantity"],
+                    "side": order["side"]
+                })
+        return flat_asks
 
     # helper function to add a limit order:
     def add_limit_order(self, order):
