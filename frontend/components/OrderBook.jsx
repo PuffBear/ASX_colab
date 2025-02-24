@@ -1,20 +1,58 @@
 import React from "react";
+import { useEffect, useState } from "react";
 
-const OrderBook = ({ setSelectedTrade }) => {
+const OrderBook = ({ setSelectedTrade, selectedStock }) => {
 
-  const asks = [
-    { price: 101.5, quantity: 2, total: 203 },
-    { price: 101.4, quantity: 3, total: 304.2 },
-    { price: 101.3, quantity: 1.5, total: 151.95 },
-  ];
+  const [bids, setBids] = useState([]);
+  const [asks, setAsks] = useState([]);
+  const [LTP, setLTP] = useState(null); // Fix: Initialize LTP state
 
-  const bids = [
-    { price: 101.2, quantity: 2.5, total: 253 },
-    { price: 101.1, quantity: 1, total: 101.1 },
-    { price: 101.0, quantity: 4, total: 404 },
-  ];
+  const fetchOrderBook = async () => {
+    if(!selectedStock) return;
 
-  const midPrice = (asks[0].price + bids[0].price) / 2;
+    try {
+      const response = await fetch(`http://127.0.0.1:5000/get_orderbook/${selectedStock}`);
+      const data = await response.json();
+
+      if (response.ok) {
+        setBids(data.bids || []);
+        console.log("Bids:", data.bids); // Log the bids received from the API
+        setAsks(data.asks || []);
+      }
+      else {
+        console.error("Error fetching order book:", data.error)
+      }
+    }
+    catch (error) {
+      console.error("Failed to fetch order book:", error)
+    }
+  }
+
+  useEffect(() => {
+    fetchOrderBook();
+
+    const interval = setInterval(fetchOrderBook, 2000);
+
+    return () => clearInterval(interval);
+  }, [selectedStock]);
+
+  useEffect(() => {
+    if (!selectedStock) return;
+
+    fetch("/stocks_historical_data.json")
+      .then((response) => response.json())
+      .then((data) => {
+        if (!data || !data[selectedStock] || !Array.isArray(data[selectedStock])) {
+          console.warn("No valid historical data found for:", selectedStock);
+          setLTP(null);
+          return;
+        }
+        const stockData = data[selectedStock];
+        setLTP(stockData.length > 0 ? stockData[stockData.length - 1].value : null);
+      })
+      .catch((error) => console.error("Error loading JSON:", error));
+  }, [selectedStock]);
+
 
   return (
     <div className="flex flex-col w-full text-white bg-gray-800">
@@ -33,17 +71,17 @@ const OrderBook = ({ setSelectedTrade }) => {
           <button
             key={index}
             className="flex justify-between px-4 py-1 hover:bg-red-700 rounded-lg"
-            onClick={() => setSelectedTrade({ type: "buy", price: ask.price, quantity: ask.quantity })}
+            onClick={() => setSelectedTrade({ type: "BUY", price: ask.price, quantity: ask.quantity })}
           >
-            <span>{ask.price.toFixed(2)}</span>
+            <span>{ask.price}</span>
             <span>{ask.quantity}</span>
-            <span>{ask.total.toFixed(2)}</span>
+            <span>{(ask.price * ask.quantity)}</span>
           </button>
         ))}
       </div>
 
-      {/* Mid Price */}
-      <div className="text-center bg-gray-900 py-2 font-bold rounded-lg">{midPrice.toFixed(2)}</div>
+      {/* Current Price */}
+      <div className="text-center bg-gray-900 py-2 font-bold rounded-lg">{LTP !== null ? LTP.toFixed(2) : "N/A"}</div>
 
       {/* Bid Orders */}
       <div className="flex flex-col bg-gray-800 p-2 rounded-lg">
@@ -51,11 +89,11 @@ const OrderBook = ({ setSelectedTrade }) => {
           <button
             key={index}
             className="flex justify-between px-4 py-1 hover:bg-green-500 rounded-lg"
-            onClick={() => setSelectedTrade({ type: "sell", price: bid.price, quantity: bid.quantity })}
+            onClick={() => setSelectedTrade({ type: "SELL", price: bid.price, quantity: bid.quantity })}
           >
-            <span>{bid.price.toFixed(2)}</span>
+            <span>{bid.price}</span>
             <span>{bid.quantity}</span>
-            <span>{bid.total.toFixed(2)}</span>
+            <span>{(bid.price * bid.quantity)}</span>
           </button>
         ))}
       </div>

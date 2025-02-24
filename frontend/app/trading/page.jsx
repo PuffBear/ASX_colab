@@ -10,7 +10,7 @@ const Page = () => {
   const chartInstanceRef = useRef(null);
   const [stockData, setStockData] = useState([]);
   const [chartWidth, setChartWidth] = useState(75); // Default: Chart takes 75% of the screen
-  const [selectedStock, setSelectedStock] = useState("Apple");
+  const [selectedStock, setSelectedStock] = useState("AAPL");
 
   // Load data.json immediately
   useEffect(() => {
@@ -135,7 +135,7 @@ const Page = () => {
         <div className="flex flex-col bg-black" style={{ width: `${100 - chartWidth}%` }}>
           {/* DOM/ORDERBOOK Section (Fixed 50%) */}
           <div className="flex justify-center items-center h-1/2 bg-gray-800">
-            <OrderBook setSelectedTrade={setSelectedTrade} />
+            <OrderBook setSelectedTrade={setSelectedTrade} selectedStock={selectedStock} />
           </div>
 
           {/* Static Horizontal Divider */}
@@ -143,7 +143,7 @@ const Page = () => {
 
           {/* Trade Placing Section (Fixed 50%) */}
           <div className="h-1/2 bg-gray-800 p-4">
-            <PlaceTrades selectedTrade={selectedTrade} />
+            <PlaceTrades selectedTrade={selectedTrade} selectedStock={selectedStock} />
           </div>
         </div>
       </div>

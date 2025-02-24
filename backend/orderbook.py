@@ -54,6 +54,13 @@ class Order:
     def __repr__(self):
         return f"Order(ID={self.orderId}, {self.side}, {self.quantity}@{self.price})"
     
+    def to_dict(self):
+        return {
+            "side": self.side,
+            "price": self.price,
+            "quantity": self.quantity
+        }
+    
 '''
 FIFO execution at the DLL level:
 '''
@@ -108,6 +115,15 @@ class OrderList:
             current = current.next
         return " -> ".join(orders) if orders else "No Orders"
     
+    def to_list(self):
+        """ Convert the linked list into a list of orders. """
+        orders = []
+        current = self.head
+        while current:
+            orders.append(current.to_dict())  # Assuming Order class has a to_dict() method
+            current = current.next
+        return orders
+    
 '''
 Price level storage execution using a skiplist.
 Benefits:
@@ -147,11 +163,11 @@ class SkipList:
                 current = current.forward[i]
             update[i] = current
 
-        # ✅ Return the existing node if found
+        # Return the existing node if found
         if current.forward[0] and current.forward[0].price == price:
             return current.forward[0]
 
-        # ✅ Insert a new node if price level doesn't exist
+        # Insert a new node if price level doesn't exist
         new_level = self.randomLevel()
         new_node = SkipListNode(price)
         new_node.orders = OrderList()
@@ -187,10 +203,21 @@ class SkipList:
         if current.forward[0] and current.forward[0].price == price:
             node_to_remove = current.forward[0]
             for i in range(len(node_to_remove.forward)):
-                if update[i]:  # ✅ Ensure update[i] is not None
+                if update[i]:  # Ensure update[i] is not None
                     update[i].forward[i] = node_to_remove.forward[i] if i < len(node_to_remove.forward) else None
             print(f"Price level {price} removed from SkipList")
     
+    def to_list(self):
+        """ Converts SkipList into a list of (price, orders) tuples """
+        orders = []
+        current = self.head.forward[0]  # Skip the head (-inf)
+        while current:
+            price_level = current.price
+            order_list = current.orders.to_list()  # Now this will work
+            orders.append((price_level, order_list))
+            current = current.forward[0]
+        return orders
+
 '''
 Create an OrderBook using a hashset, for efficient lookup addition, deletion. 
 O(1) order retrieval.
@@ -207,6 +234,32 @@ class OrderBook:
         self.trades = []
         self.ltp = None # adding an ltp attribute
 
+    def get_bids(self):
+        """Return all bid orders as a flat list of dicts."""
+        bids = self.bids.to_list()
+        flat_bids = []
+        for price, orders in bids:
+            for order in orders:
+                flat_bids.append({
+                    "price": order["price"],
+                    "quantity": order["quantity"],
+                    "side": order["side"]
+                })
+        return flat_bids
+
+    def get_asks(self):
+        """Return all ask orders as a flat list of dicts."""
+        asks = self.asks.to_list()
+        flat_asks = []
+        for price, orders in asks:
+            for order in orders:
+                flat_asks.append({
+                    "price": order["price"],
+                    "quantity": order["quantity"],
+                    "side": order["side"]
+                })
+        return flat_asks
+
     # helper function to add a limit order:
     def add_limit_order(self, order):
         """Add an order to the order book."""
@@ -215,14 +268,25 @@ class OrderBook:
         else:
             price_node = self.asks.insertPrice(order.price)
 
-        # ✅ Only add order if it's not already in the order book
+        # Only add order if it's not already in the order book
         if order.orderId not in self.orders:
             price_node.orders.addOrder(order)
             self.orders[order.orderId] = order
             print(f"Added LIMIT Order: {order.side} {order.quantity} @ {order.price}")
 
-        # ✅ Continuously match orders after each insertion
+        # Continuously match orders after each insertion
         self.matchAllOrders()
+
+    def process_order(self, stock, quantity, order_type, price):
+    # Placeholder logic (Replace with actual order processing)
+        return {
+            "stock": stock,
+            "quantity": quantity,
+            "order_type": order_type,
+            "price": price,
+            "status": "filled"  # or "pending"
+        }
+
 
 
     # gives the highest buy price order
@@ -241,7 +305,7 @@ class OrderBook:
         trade_price = match_order.price
         print(f"Trade Executed: {trade_qty} @ {trade_price}")
 
-        # ✅ Update LTP after every trade
+        # Update LTP after every trade
         self.ltp = trade_price
         print("-------------------")
         print("|                 |")
@@ -255,38 +319,38 @@ class OrderBook:
         print("|                 |")
         print("-------------------")
 
-        # ✅ Record the trade
+        # Record the trade
         self.trades.append((order.orderId, match_order.orderId, trade_price, trade_qty))
 
-        # ✅ Update Quantities
+        # Update Quantities
         order.quantity -= trade_qty
         match_order.quantity -= trade_qty
 
-        # ✅ Correct Behavior for Partial Fills
+        # Correct Behavior for Partial Fills
         if match_order.quantity == 0:
-            self.cancelOrder(match_order.orderId)  # ✅ Fully filled, remove from order book
+            self.cancelOrder(match_order.orderId)  # Fully filled, remove from order book
         else:
-            self.update_order_quantity(match_order)  # ✅ Partial fill, update quantity
+            self.update_order_quantity(match_order)  # Partial fill, update quantity
 
         if order.quantity == 0:
-            self.cancelOrder(order.orderId)  # ✅ Fully filled, remove from order book
+            self.cancelOrder(order.orderId)  # Fully filled, remove from order book
         else:
-            self.update_order_quantity(order)  # ✅ Partial fill, update quantity
+            self.update_order_quantity(order)  # Partial fill, update quantity
 
 
     def update_order_quantity(self, order):
         """Update the quantity of an order without removing it."""
-        # ✅ Locate the correct price node
+        # Locate the correct price node
         if order.side == "BUY":
             price_node = self.bids.insertPrice(order.price)
         else:
             price_node = self.asks.insertPrice(order.price)
 
-        # ✅ Traverse FIFO queue to update the order's quantity
+        # Traverse FIFO queue to update the order's quantity
         current = price_node.orders.head
         while current:
             if current.orderId == order.orderId:
-                current.quantity = order.quantity  # ✅ Update quantity in FIFO queue
+                current.quantity = order.quantity  # Update quantity in FIFO queue
                 return
             current = current.next
 
@@ -306,7 +370,7 @@ class OrderBook:
             price_node.orders.removeOrder(order)
             del self.orders[orderId]
 
-            # ✅ Check if the price level is empty
+            # Check if the price level is empty
             if check_price_level:
                 self.check_price_level(order.side, order.price)
 
@@ -319,12 +383,12 @@ class OrderBook:
             price_node = self.bids.insertPrice(price)
             if price_node.orders.size == 0:
                 self.bids.removePriceLevel(price)
-                print(f"✅ Price level {price} removed from BUY book")
+                print(f"Price level {price} removed from BUY book")
         else:
             price_node = self.asks.insertPrice(price)
             if price_node.orders.size == 0:
                 self.asks.removePriceLevel(price)
-                print(f"✅ Price level {price} removed from SELL book")
+                print(f"Price level {price} removed from SELL book")
 
 
     def matchOrder(self, order):
@@ -334,14 +398,14 @@ class OrderBook:
         if order.side == "BUY":
             while order.quantity > 0:
                 best_ask_price = self.get_best_ask()
-                # ✅ Exit if no matching SELL orders
+                # Exit if no matching SELL orders
                 if best_ask_price is None or best_ask_price > order.price:
-                    # ✅ No match found - add order to the book
+                    # No match found - add order to the book
                     self.add_limit_order(order)
                     return
 
                 ask_node = self.asks.head.forward[0]
-                matched = False  # ✅ Track if the order is matched
+                matched = False  # Track if the order is matched
 
                 while ask_node and ask_node.price <= order.price:
                     if ask_node.orders.size == 0:
@@ -366,7 +430,7 @@ class OrderBook:
                     if order.quantity == 0 or ask_node is None:
                         break
 
-                # ✅ If no match found, add order to the book
+                # If no match found, add order to the book
                 if not matched and order.quantity > 0:
                     self.add_limit_order(order)
                     return
@@ -375,14 +439,14 @@ class OrderBook:
         else:
             while order.quantity > 0:
                 best_bid_price = self.get_best_bid()
-                # ✅ Exit if no matching BUY orders
+                # Exit if no matching BUY orders
                 if best_bid_price is None or best_bid_price < order.price:
-                    # ✅ No match found - add order to the book
+                    # No match found - add order to the book
                     self.add_limit_order(order)
                     return
 
                 bid_node = self.bids.head.forward[0]
-                matched = False  # ✅ Track if the order is matched
+                matched = False  # Track if the order is matched
 
                 while bid_node and bid_node.price >= order.price:
                     if bid_node.orders.size == 0:
@@ -407,12 +471,12 @@ class OrderBook:
                     if order.quantity == 0 or bid_node is None:
                         break
 
-                # ✅ If no match found, add order to the book
+                # If no match found, add order to the book
                 if not matched and order.quantity > 0:
                     self.add_limit_order(order)
                     return
 
-        # ✅ If the order is partially filled, add the remaining volume to the book
+        # If the order is partially filled, add the remaining volume to the book
         if order.quantity > 0 and order.orderId not in self.orders:
             self.add_limit_order(order)
 
@@ -422,20 +486,20 @@ class OrderBook:
             best_bid_price = self.get_best_bid()
             best_ask_price = self.get_best_ask()
 
-            # ✅ Break if no cross exists
+            # Break if no cross exists
             if best_bid_price is None or best_ask_price is None or best_bid_price < best_ask_price:
                 break
 
-            # ✅ Get the order nodes
+            # Get the order nodes
             bid_node = self.bids.insertPrice(best_bid_price)
             ask_node = self.asks.insertPrice(best_ask_price)
 
-            # ✅ Match FIFO orders at the best price
+            # Match FIFO orders at the best price
             while bid_node.orders.size > 0 and ask_node.orders.size > 0:
                 bid_order = bid_node.orders.getOldestOrder()
                 ask_order = ask_node.orders.getOldestOrder()
 
-                # ✅ Match orders with partial fills
+                # Match orders with partial fills
                 trade_qty = min(bid_order.quantity, ask_order.quantity)
                 self.execute_trade(bid_order, ask_order, trade_qty)
 
