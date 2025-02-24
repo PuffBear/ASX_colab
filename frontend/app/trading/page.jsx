@@ -4,29 +4,22 @@ import { ColorType, createChart, LineSeries } from "lightweight-charts";
 import StockDropdown from "@/components/StockDropdown";
 import OrderBook from "@/components/OrderBook";
 import PlaceTrades from "@/components/PlaceTrades";
+import { snippet } from "@heroui/theme";
 
 const Page = () => {
   const chartContainerRef = useRef(null);
   const chartInstanceRef = useRef(null);
-  const [stockData, setStockData] = useState([]);
   const [chartWidth, setChartWidth] = useState(75); // Default: Chart takes 75% of the screen
   const [selectedStock, setSelectedStock] = useState("AAPL");
+  const [chartData, setChartData] = useState([]);
+  
+  const [LTP, setLTP] = useState(null);
+  const [bufferedLTP, setBufferedLTP] = useState(null);
+  const [lastKnownLTP, setLastKnownLTP] = useState(null);
 
-  // Load data.json immediately
-  useEffect(() => {
-    // Load stock historical data
-    fetch("/stocks_historical_data.json")
-      .then((response) => response.json())
-      .then((data) => {
-        if (data[selectedStock]) {
-          setStockData(data[selectedStock]); // Filter data based on selected stock
-        }
-      })
-      .catch((error) => console.error("Error loading stock data:", error));
-  }, [selectedStock]); // Runs when selectedStock changes
 
   useEffect(() => {
-    if (!chartContainerRef.current || stockData.length === 0) return;
+    if (!chartContainerRef.current) return;
 
     // Create chart instance
     const chart = createChart(chartContainerRef.current, {
@@ -40,12 +33,21 @@ const Page = () => {
       },
       autoSize: true,
       priceScale: { borderVisible: false, textColor: "white" },
-      timeScale: { borderVisible: false, textColor: "white" },
+      timeScale: {
+        borderVisible: false, 
+        textColor: "white",
+        timeVisible: true,
+        secondsVisible: false,
+        tickMarkFormatter: (timestamp) => {
+          const date = new Date(timestamp * 1000);
+          return `${date.getHours()}:${date.getMinutes().toString().padStart(2, "0")}`;
+        }
+      },
     });
 
     chartInstanceRef.current = chart;
     const newSeries = chart.addSeries(LineSeries, { color: "#2962ff" });
-    newSeries.setData(stockData);
+    newSeries.setData(chartData);
 
     // Resize observer
     const resizeObserver = new ResizeObserver(() => {
@@ -60,7 +62,33 @@ const Page = () => {
       resizeObserver.disconnect();
       chart.remove();
     };
-  }, [stockData]);
+  }, [chartData]);
+
+  //Update Buffered LTP when LTP changes
+  useEffect(() => {
+    if (LTP !== null) {
+      console.log("Buffered LTP updated:", LTP);
+      setBufferedLTP(LTP);
+      setLastKnownLTP(LTP);
+    }
+  }, [LTP]);
+  
+  // Update chart data at the end of every minute
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = new Date();
+      if (now.getSeconds() === 0) { // Check if it's the start of a new minute
+        if (bufferedLTP !== null || lastKnownLTP !== null) {
+          const timestamp = Math.floor(now.getTime() / 1000); // Convert to Unix timestamp
+          const newDataPoint = { time: timestamp, value: bufferedLTP !== null ? bufferedLTP : lastKnownLTP };
+          setChartData((prevData) => [...prevData, newDataPoint]);
+          setBufferedLTP(null); // Clear the buffered LTP after updating
+        }
+      }
+    }, 1000); // Check every second
+
+    return () => clearInterval(interval);
+  }, [bufferedLTP]);
 
   // Prevent Chrome Back/Forward Gesture When Dragging Chart
   useEffect(() => {
@@ -118,7 +146,7 @@ const Page = () => {
       <div className="flex flex-row flex-grow z-[0]">
         {/* Chart Section */}
         <div className="bg-black p-2" style={{ width: `${chartWidth}%` }}>
-          {stockData.length === 0 ? (
+          {chartData.length === 0 ? (
             <div className="text-white text-center mt-10">Loading Chart...</div>
           ) : (
             <div ref={chartContainerRef} className="w-full h-full"></div>
@@ -135,7 +163,7 @@ const Page = () => {
         <div className="flex flex-col bg-black" style={{ width: `${100 - chartWidth}%` }}>
           {/* DOM/ORDERBOOK Section (Fixed 50%) */}
           <div className="flex justify-center items-center h-1/2 bg-gray-800">
-            <OrderBook setSelectedTrade={setSelectedTrade} selectedStock={selectedStock} />
+            <OrderBook setSelectedTrade={setSelectedTrade} selectedStock={selectedStock} setLTP={setLTP} LTP={LTP} />
           </div>
 
           {/* Static Horizontal Divider */}
