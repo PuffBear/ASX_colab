@@ -1,11 +1,10 @@
 import React from "react";
 import { useEffect, useState } from "react";
 
-const OrderBook = ({ setSelectedTrade, selectedStock }) => {
+const OrderBook = ({ setSelectedTrade, selectedStock, setLTP, LTP }) => {
 
   const [bids, setBids] = useState([]);
   const [asks, setAsks] = useState([]);
-  const [LTP, setLTP] = useState(null); // Fix: Initialize LTP state
 
   const fetchOrderBook = async () => {
     if(!selectedStock) return;
@@ -16,8 +15,8 @@ const OrderBook = ({ setSelectedTrade, selectedStock }) => {
 
       if (response.ok) {
         setBids(data.bids || []);
-        console.log("Bids:", data.bids); // Log the bids received from the API
         setAsks(data.asks || []);
+        setLTP(data.ltp);
       }
       else {
         console.error("Error fetching order book:", data.error)
@@ -34,23 +33,6 @@ const OrderBook = ({ setSelectedTrade, selectedStock }) => {
     const interval = setInterval(fetchOrderBook, 2000);
 
     return () => clearInterval(interval);
-  }, [selectedStock]);
-
-  useEffect(() => {
-    if (!selectedStock) return;
-
-    fetch("/stocks_historical_data.json")
-      .then((response) => response.json())
-      .then((data) => {
-        if (!data || !data[selectedStock] || !Array.isArray(data[selectedStock])) {
-          console.warn("No valid historical data found for:", selectedStock);
-          setLTP(null);
-          return;
-        }
-        const stockData = data[selectedStock];
-        setLTP(stockData.length > 0 ? stockData[stockData.length - 1].value : null);
-      })
-      .catch((error) => console.error("Error loading JSON:", error));
   }, [selectedStock]);
 
 

@@ -54,10 +54,13 @@ def get_orderbook(symbol):
         # Get bids and asks
         bids = order_book.get_bids()
         asks = order_book.get_asks()
+
+        ltp = order_book.get_ltp()
         
         return jsonify({
             "bids": bids,
             "asks": asks,
+            "ltp": ltp,
         })
     
     except Exception as e:

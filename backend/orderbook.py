@@ -299,6 +299,8 @@ class OrderBook:
         """ Get the best ask price using SkipList """
         return self.asks.getBestAsk()
     
+    def get_ltp(self):
+        return self.ltp
     
     def execute_trade(self, order, match_order, trade_qty):
         """Execute a trade between two orders."""
