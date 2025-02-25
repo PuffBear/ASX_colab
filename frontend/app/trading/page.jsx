@@ -21,7 +21,7 @@ const Page = () => {
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
-    // Create chart instance
+    // Create chart instance (chart rendering start)
     const chart = createChart(chartContainerRef.current, {
       layout: {
         background: { type: ColorType.Solid, color: "black" },
@@ -89,6 +89,7 @@ const Page = () => {
 
     return () => clearInterval(interval);
   }, [bufferedLTP]);
+  //chart rendering end
 
   // Prevent Chrome Back/Forward Gesture When Dragging Chart
   useEffect(() => {
