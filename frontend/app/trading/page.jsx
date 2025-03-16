@@ -73,19 +73,21 @@ const Page = () => {
     }
   }, [LTP]);
   
-  // Update chart data at the end of every minute
+  // Update chart data with a buffer of 2 seconds, data is checked every milisecond
   useEffect(() => {
+    let lastUpdateTime = Date.now(); // Track the last update timestamp
     const interval = setInterval(() => {
       const now = new Date();
-      if (now.getSeconds() === 0) { // Check if it's the start of a new minute
+      if (now - lastUpdateTime >= 2000) { // Check if it's the start of a new minute
         if (bufferedLTP !== null || lastKnownLTP !== null) {
           const timestamp = Math.floor(now.getTime() / 1000); // Convert to Unix timestamp
           const newDataPoint = { time: timestamp, value: bufferedLTP !== null ? bufferedLTP : lastKnownLTP };
           setChartData((prevData) => [...prevData, newDataPoint]);
           setBufferedLTP(null); // Clear the buffered LTP after updating
+          lastUpdateTime = now; // Reset the last update time
         }
       }
-    }, 1000); // Check every second
+    }, 100); // Check every milisecond
 
     return () => clearInterval(interval);
   }, [bufferedLTP]);
