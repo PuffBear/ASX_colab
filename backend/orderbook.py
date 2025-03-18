@@ -34,7 +34,7 @@ class Order:
     # time of insertion of the order in the database
     order_counter = itertools.count(1)
 
-    def __init__(self, orderSide, price, quantity, orderType):
+    def __init__(self, orderSide, price, quantity, orderType, trader_id=None):
         # define the order's unique order id
         self.orderId = next(Order.order_counter)
         # is it a BUY or SELL -side order?
@@ -43,6 +43,7 @@ class Order:
         self.quantity = quantity
         # is it a Limit, Market, Stop order
         self.orderType = orderType
+        self.trader_id = trader_id or "anonymous"  # Default to "anonymous" if None
         # what is the time when the order is placed.
         self.timestamp = time.time()
         # for the DLL-FIFO implementation
@@ -52,13 +53,14 @@ class Order:
     # how to represent an order in the form of a string:
     # keep for debugging, but remove remove if I am logging everything into SQL.
     def __repr__(self):
-        return f"Order(ID={self.orderId}, {self.side}, {self.quantity}@{self.price})"
+        return f"Order(ID={self.orderId}, {self.side}, {self.quantity}@{self.price}, Trader={self.trader_id})"
     
     def to_dict(self):
         return {
             "side": self.side,
             "price": self.price,
-            "quantity": self.quantity
+            "quantity": self.quantity,
+            "trader_id": self.trader_id  # Include for API response
         }
     
 '''
