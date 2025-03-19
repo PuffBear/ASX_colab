@@ -30,10 +30,10 @@ const OrderBook = ({ setSelectedTrade, selectedStock, setLTP, LTP }) => {
   useEffect(() => {
     fetchOrderBook();
 
-    const interval = setInterval(fetchOrderBook, 2000);
+    const interval = setInterval(fetchOrderBook, 1000); // Faster polling (1s)
 
     return () => clearInterval(interval);
-  }, [selectedStock]);
+  }, [selectedStock, setLTP]); // added setLTP for completeness
 
 
   return (

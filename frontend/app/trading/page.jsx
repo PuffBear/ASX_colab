@@ -81,7 +81,10 @@ const Page = () => {
       if (now - lastUpdateTime >= 2000) { // Check if it's the start of a new minute
         if (bufferedLTP !== null || lastKnownLTP !== null) {
           const timestamp = Math.floor(now.getTime() / 1000); // Convert to Unix timestamp
-          const newDataPoint = { time: timestamp, value: bufferedLTP !== null ? bufferedLTP : lastKnownLTP };
+          const newDataPoint = { 
+            time: timestamp, 
+            value: bufferedLTP !== null ? bufferedLTP : lastKnownLTP 
+          };
           setChartData((prevData) => [...prevData, newDataPoint]);
           setBufferedLTP(null); // Clear the buffered LTP after updating
           lastUpdateTime = now; // Reset the last update time
@@ -90,7 +93,7 @@ const Page = () => {
     }, 100); // Check every milisecond
 
     return () => clearInterval(interval);
-  }, [bufferedLTP]);
+  }, [bufferedLTP, lastKnownLTP]); // Add lastKnownLTP to dependencies.
   //chart rendering end
 
   // Prevent Chrome Back/Forward Gesture When Dragging Chart
